@@ -1,0 +1,34 @@
+{
+  "name": "playwright-afp",
+  "version": "0.0.1",
+  "description": "Stop website fingerprinting techniques playwright edition",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pavlealeksic/playwright-afp.git"
+  },
+  "author": "Pavle Aleksic",
+  "license": "MIT",
+  "keywords": [
+    "npm",
+    "playwright",
+    "security",
+    "nodejs",
+    "stealth",
+    "detection-evasion",
+    "anti-fingerprint",
+    "scraping",
+    "crawler",
+    "chrome",
+    "headless",
+    "scraping",
+    "browser automation"
+  ],
+  "bugs": {
+    "url": "https://github.com/pavlealeksic/playwright-afp/issues"
+  },
+  "homepage": "https://github.com/pavlealeksic/playwright-afp#readme"
+}
