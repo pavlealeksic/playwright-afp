@@ -348,14 +348,14 @@ const protectIt = async (pageOrContext, options) => {
         context.createAnalyser(AudioContext);
         context.createAnalyser(OfflineAudioContext);
         // Web RTC
-        navigator.mediaDevices.getUserMedia =
-            navigator.webkitGetUserMedia =
-            navigator.mozGetUserMedia =
-            navigator.getUserMedia =
-            webkitRTCPeerConnection =
-            RTCPeerConnection =
-            MediaStreamTrack =
-                undefined;
+        if (window.afpOptions.webRTCProtect) navigator.mediaDevices.getUserMedia =
+        navigator.webkitGetUserMedia =
+        navigator.mozGetUserMedia =
+        navigator.getUserMedia =
+        webkitRTCPeerConnection =
+        RTCPeerConnection =
+        MediaStreamTrack =
+            undefined;
 
         Object.defineProperty(navigator, "deviceMemory", {
             get: () =>

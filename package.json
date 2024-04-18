@@ -1,6 +1,6 @@
 {
   "name": "playwright-afp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Stop website fingerprinting techniques playwright edition",
   "main": "index.js",
   "scripts": {
