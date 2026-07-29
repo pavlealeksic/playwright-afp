@@ -1,6 +1,6 @@
 {
   "name": "playwright-afp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Anti-fingerprint protection for Playwright: coherent profiles, canvas, WebGL, audio, fonts, WebRTC, navigator and headless-detection evasion",
   "main": "index.js",
   "types": "index.d.ts",
