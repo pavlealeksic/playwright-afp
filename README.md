@@ -1,82 +1,183 @@
 # playwright-afp
-Stop websites fingerprinting your puppeteer browser instances.
 
-This covers:
-Canvas Fingerprinting, WebGL Fingerprinting, AudioContext Fingerprinting, Font Fingerprinting
+Stop websites from fingerprinting your Playwright browser instances.
+
+Covers: **Canvas** (incl. OffscreenCanvas), **WebGL**, **AudioContext**,
+**font measurement**, **navigator identity**, **screen geometry**,
+**plugins/mimeTypes**, **permissions**, **WebRTC** and
+**`navigator.webdriver`**.
+
+## What's new in 1.0.0
+
+- **Coherent fingerprint profiles** — `generateProfile()` builds a full set
+  of attributes (UA, platform, Client Hints, screen, WebGL renderer,
+  memory, cores) that all describe the same plausible machine. Mismatched
+  attributes are the easiest way to get flagged.
+- **Deterministic fingerprints** — all noise is derived from a seeded PRNG.
+  A fingerprint stays stable for the whole session and can be reproduced
+  later by reusing the seed.
+- **New coverage** — navigator identity (`userAgent`, `platform`, `vendor`,
+  `languages`, `userAgentData`), `screen.*` + `outerWidth/outerHeight`,
+  PDF `plugins`/`mimeTypes`, `permissions.query` notifications fix,
+  `OffscreenCanvas`, `measureText`, modern `ANGLE (...)` WebGL renderer
+  strings, and `Function.prototype.toString` spoofing so the injected
+  proxies can't be detected.
+- **Bug fixes** — user-supplied WebGL overrides now actually apply, audio
+  noise applies to every buffer (not just the first), analyser proxies no
+  longer stack, repeated canvas reads stay consistent, and `offsetHeight`
+  no longer returns `undefined`.
+- Backward compatible with the `0.0.x` option names.
 
 ## Installation
 
 ```bash
-yarn add playwright-afp
-# - or -
 npm install playwright-afp
+# - or -
+yarn add playwright-afp
 ```
+
 ## Usage
+
+### Recommended: coherent profile
 
 ```js
 const { chromium } = require('playwright');
 const protectIt = require('playwright-afp');
 
+const profile = protectIt.generateProfile({ os: 'windows', seed: 123456 });
+
 const browser = await chromium.launch();
-const browserContext = await browser.newContext();
-// For these options, all are optional, and you dont have to use them, 
-// these are used just if you want to reuse a fingerprint
-const options = {
-        canvasRgba: [0, 0, 0, 0], //all these numbers can be from -5 to 5
-        webglData: {
-            3379: 32768, //16384, 32768
-            3386: {
-                0: 32768, // 8192, 16384, 32768
-                1: 32768, // 8192, 16384, 32768
-            },
-            3410: 2, // 2, 4, 8, 16
-            3411: 2, // 2, 4, 8, 16
-            3412: 16, // 2, 4, 8, 16
-            3413: 2, // 2, 4, 8, 16
-            7938: "WebGL 1.0 (OpenGL Chromium)", // "WebGL 1.0", "WebGL 1.0 (OpenGL)", "WebGL 1.0 (OpenGL Chromium)"
-            33901: {
-                0: 1,
-                1: 1, // 1, 1024, 2048, 4096, 8192
-            },
-            33902: {
-                0: 1,
-                1: 4096, // 1, 1024, 2048, 4096, 8192
-            },
-            34024: 32768, //16384, 32768
-            34047: 8, // 2, 4, 8, 16
-            34076: 16384, //16384, 32768
-            34921: 16, // 2, 4, 8, 16
-            34930: 16, // 2, 4, 8, 16
-            35660: 2, // 2, 4, 8, 16
-            35661: 32, // 16, 32, 64, 128, 256
-            35724: "WebGL GLSL ES", // "WebGL", "WebGL GLSL", "WebGL GLSL ES", "WebGL GLSL ES (OpenGL Chromium)"
-            36347: 4096, // 4096, 8192
-            36349: 8192, // 1024, 2048, 4096, 8192
-            37446: "HD Graphics", // "Graphics", "HD Graphics", "Intel(R) HD Graphics"
-        },
-        fontFingerprint: {
-            noise: 1, // -1, 0, 1, 2
-            sign: +1, // -1, +1
-        },
-        audioFingerprint: {
-            getChannelDataIndexRandom: 0.7659530895341677, // all values of Math.random() can be used
-            getChannelDataResultRandom: 0.7659530895341677, // all values of Math.random() can be used
-            createAnalyserIndexRandom: 0.7659530895341677, // all values of Math.random() can be used
-            createAnalyserResultRandom: 0.7659530895341677, // all values of Math.random() can be used
-        },
-        webRTCProtect: true //this option is used to disable or enable WebRTC disabling by destroying get user media
-    };
-// run this function on any page you want to protect, so pages loaded on 
-// this page after this is done will be protected
-const page = browser.newPage()
-await protectIt(page, options)
-// you can also protect the whole context by just running:
-await protectIt(browserContext, options)
+// Pass the profile's UA and screen to the context so HTTP headers,
+// viewport and JS-reported values all agree.
+const context = await browser.newContext({
+  userAgent: profile.userAgent,
+  viewport: { width: profile.screen.width, height: profile.screen.height },
+  locale: profile.languages[0],
+});
 
+const seed = await protectIt(context, { profile, seed: 123456, webRTC: true });
+// store `seed` (and `profile`) to reproduce this exact fingerprint later
 
+const page = await context.newPage();
 ```
 
-Go to https://webbrowsertools.com with your browser and check your fingerprints
+### Simple
+
+```js
+await protectIt(page); // random seed, default protections
+await protectIt(context, { profile: 'mac' }); // generate a mac profile internally
+```
+
+## Options
+
+All options are optional; defaults are shown below.
+
+```js
+await protectIt(context, {
+  // Integer seed for the deterministic noise generator. Default: random.
+  seed: 123456,
+
+  // Profile object from generateProfile(), or an OS name ('windows' |
+  // 'mac' | 'linux'). Provides coherent defaults for navigator, screen,
+  // deviceMemory, hardwareConcurrency and the WebGL vendor/renderer.
+  // Explicit options below override the profile. Default: none.
+  profile: 'windows',
+
+  // Canvas fingerprinting (incl. OffscreenCanvas). Shifts every pixel by a
+  // fixed RGBA offset (components -5..5). Default: true.
+  canvas: true, // or { rgba: [0, 0, 0, 0] }
+
+  // WebGL fingerprinting. Spoofs vendor/renderer strings and hardware
+  // limits, adds noise to buffer data. Default: true.
+  webgl: true, // or { data: { 3379: 32768, 37446: 'ANGLE (...)' } }
+
+  // AudioContext fingerprinting. Default: true.
+  audio: true,
+
+  // Font fingerprinting: skews offsetHeight/offsetWidth and measureText.
+  // Default: true.
+  fonts: true, // or { noise: 1, sign: +1 }
+
+  // Remove RTCPeerConnection & getUserMedia so the real IP cannot leak.
+  // Default: false.
+  webRTC: true,
+
+  // Hide navigator.webdriver. Default: true.
+  webdriver: true,
+
+  // Navigator identity. true = only strip the headless marker from the
+  // real UA. Object form spoofs userAgent/platform/vendor/languages/
+  // userAgentData. Default: false (profile provides it when given).
+  navigator: true,
+
+  // Screen geometry + window.outerWidth/outerHeight. Default: false
+  // (profile provides it when given).
+  screen: { width: 1920, height: 1080, availHeight: 1040 },
+
+  // Fake the five standard PDF plugins and their mimeTypes. Default: false.
+  plugins: true,
+
+  // Keep permissions.query('notifications') consistent with
+  // Notification.permission. Default: true.
+  permissions: true,
+
+  // Spoof navigator.deviceMemory / hardwareConcurrency. A number for a
+  // fixed value, true for a seeded random one. Default: profile value,
+  // otherwise untouched.
+  deviceMemory: 8,
+  hardwareConcurrency: 8,
+});
+```
+
+### Pinning WebGL parameters
+
+`webgl.data` maps GL parameter constants to fixed values. Array-valued
+parameters accept a `{ 0: x, 1: y }` shorthand:
+
+```js
+webgl: {
+  data: {
+    3379: 32768,                     // MAX_TEXTURE_SIZE: 16384 or 32768
+    3386: { 0: 32768, 1: 32768 },    // MAX_VIEWPORT_DIMS
+    34024: 32768,                    // MAX_RENDERBUFFER_SIZE
+    36347: 4096,                     // MAX_VERTEX_UNIFORM_VECTORS
+    36349: 8192,                     // MAX_FRAGMENT_UNIFORM_VECTORS
+    33901: { 0: 1, 1: 1024 },        // ALIASED_POINT_SIZE_RANGE
+    33902: { 0: 1, 1: 4096 },        // ALIASED_LINE_WIDTH_RANGE
+    7938: 'WebGL 1.0 (OpenGL ES 2.0 Chromium)', // VERSION
+    35724: 'WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)',
+    37445: 'Google Inc.',            // UNMASKED_VENDOR_WEBGL
+    37446: 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+  },
+}
+```
+
+### Tips
+
+- Set the same `userAgent` in `browser.newContext()` and in the profile —
+  otherwise the HTTP `User-Agent` header and `navigator.userAgent` differ,
+  which is itself detectable.
+- Use Playwright's native `locale` and `timezoneId` context options to
+  match your profile's languages and your proxy's location.
+- Reuse a `seed` + `profile` pair per account/session to keep the
+  fingerprint stable over time; rotate it to look like a new machine.
+
+## Verifying
+
+Point the protected browser at <https://webbrowsertools.com> or a similar
+fingerprinting test page and check that the reported canvas/WebGL/audio
+fingerprints differ from your real ones (and stay stable across reloads
+when a `seed` is set).
+
+## Migrating from 0.0.x
+
+Old option names still work — `canvasRgba`, `webglData`, `fontFingerprint`,
+`audioFingerprint` and `webRTCProtect` are mapped onto the new options.
+Behavioral changes to be aware of:
+
+- `deviceMemory` is no longer randomized by default; set it explicitly (or
+  use a profile) if you want it spoofed.
+- All noise is deterministic per seed instead of re-randomized on every call.
 
 ## Creator
 
@@ -85,4 +186,5 @@ Go to https://webbrowsertools.com with your browser and check your fingerprints
 - <https://twitter.com/aleksicpaja>
 
 ## License
+
 This project is licensed under the terms of the MIT license.

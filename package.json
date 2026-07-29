@@ -1,10 +1,16 @@
 {
   "name": "playwright-afp",
-  "version": "0.0.3",
-  "description": "Stop website fingerprinting techniques playwright edition",
+  "version": "1.0.0",
+  "description": "Anti-fingerprint protection for Playwright: coherent profiles, canvas, WebGL, audio, fonts, WebRTC, navigator and headless-detection evasion",
   "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "profiles.js"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/smoke.js"
   },
   "repository": {
     "type": "git",
@@ -12,6 +18,9 @@
   },
   "author": "Pavle Aleksic",
   "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
   "keywords": [
     "npm",
     "playwright",
@@ -24,9 +33,11 @@
     "crawler",
     "chrome",
     "headless",
-    "scraping",
     "browser automation"
   ],
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  },
   "bugs": {
     "url": "https://github.com/pavlealeksic/playwright-afp/issues"
   },
